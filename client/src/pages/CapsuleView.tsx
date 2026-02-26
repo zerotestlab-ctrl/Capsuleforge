@@ -1,135 +1,170 @@
-import { useRoute } from "wouter";
+import * as React from "react";
+import { useParams, Link } from "wouter";
+import { ExternalLink, FileX, Loader2, ShieldCheck, Calendar, Fingerprint } from "lucide-react";
+
+import { NeonShell } from "@/components/NeonShell";
+import { BrandHeader } from "@/components/BrandHeader";
+import { CopyField } from "@/components/CopyField";
+import { Button } from "@/components/ui/button";
+import { Separator } from "@/components/ui/separator";
+
 import { useCapsule } from "@/hooks/use-capsules";
-import { Header } from "@/components/layout/Header";
-import { GlassCard } from "@/components/ui/glass-card";
-import { Loader2, Shield, Calendar, Wallet, ExternalLink, ArrowLeft } from "lucide-react";
-import { Link } from "wouter";
+import { useSupabaseCapsule } from "@/hooks/use-supabase-capsules";
+import { cn } from "@/lib/utils";
 
 export default function CapsuleView() {
-  const [, params] = useRoute("/c/:id");
+  const params = useParams<{ id: string }>();
   const id = params?.id || "";
-  
-  const { data: capsule, isLoading, error } = useCapsule(id);
 
-  if (isLoading) {
-    return (
-      <div className="min-h-screen flex flex-col">
-        <Header />
-        <div className="flex-1 flex items-center justify-center">
-          <Loader2 className="w-12 h-12 text-primary animate-spin" />
-        </div>
-      </div>
-    );
-  }
+  // Prefer Supabase for public read; fallback to backend if needed.
+  const supabase = useSupabaseCapsule(id);
+  const backend = useCapsule(id);
 
-  if (error || !capsule) {
-    return (
-      <div className="min-h-screen flex flex-col">
-        <Header />
-        <div className="flex-1 flex flex-col items-center justify-center text-center px-4">
-          <Shield className="w-16 h-16 text-destructive mb-4 opacity-50" />
-          <h2 className="text-2xl font-bold mb-2">Capsule Not Found</h2>
-          <p className="text-muted-foreground mb-6">The requested origin capsule could not be located or does not exist.</p>
-          <Link href="/" className="px-6 py-3 bg-white/10 rounded-xl hover:bg-white/20 transition-colors">
-            Return Home
-          </Link>
-        </div>
-      </div>
-    );
-  }
+  const data = supabase.data ?? backend.data ?? null;
+  const isLoading = supabase.isLoading || backend.isLoading;
+  const error = supabase.error || backend.error;
 
-  const date = new Date(capsule.createdAt || Date.now());
+  const verificationUrl = id ? `${window.location.origin}/c/${id}` : "";
 
   return (
-    <div className="min-h-screen flex flex-col pb-20">
-      <Header />
-      
-      <main className="container mx-auto px-4 mt-8 max-w-4xl">
-        <Link href="/" className="inline-flex items-center gap-2 text-muted-foreground hover:text-primary transition-colors mb-8">
-          <ArrowLeft className="w-4 h-4" /> Back to Forge
-        </Link>
+    <NeonShell>
+      <BrandHeader
+        rightSlot={
+          <Button asChild variant="secondary">
+            <Link href="/">Create a capsule</Link>
+          </Button>
+        }
+      />
 
-        <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-12">
-          <div>
-            <div className="flex items-center gap-3 mb-2">
-              <span className="px-3 py-1 bg-primary/20 text-primary text-xs font-bold uppercase tracking-wider rounded-full border border-primary/30">
-                Verified Origin
-              </span>
-              {capsule.xHandle && (
-                <span className="text-sm text-white/50">{capsule.xHandle}</span>
-              )}
-            </div>
-            <h1 className="text-4xl md:text-5xl font-bold text-glow mb-4">{capsule.projectName}</h1>
-            <p className="text-lg text-white/70">{capsule.description}</p>
-          </div>
-          
-          <div className="text-left md:text-right space-y-1">
-            <p className="text-sm text-white/40 flex items-center md:justify-end gap-2">
-              <Calendar className="w-4 h-4" /> Sealed on Base
-            </p>
-            <p className="font-mono text-white/90">
-              {date.toLocaleDateString()} at {date.toLocaleTimeString()}
-            </p>
-          </div>
-        </div>
-
-        <div className="space-y-6">
-          <GlassCard className="space-y-6">
-            <h3 className="text-xl font-bold flex items-center gap-2 border-b border-white/10 pb-4">
-              <Shield className="w-5 h-5 text-primary" /> Cryptographic Proof
-            </h3>
-            
-            <div className="grid grid-cols-1 gap-6">
-              <div>
-                <p className="text-sm text-white/50 mb-1">Capsule ID</p>
-                <div className="p-3 bg-black/40 rounded-xl font-mono text-sm border border-white/5 text-white/90 break-all">
-                  {capsule.id}
-                </div>
-              </div>
-
-              <div>
-                <p className="text-sm text-white/50 mb-1">SHA-256 Hash</p>
-                <div className="p-3 bg-black/40 rounded-xl font-mono text-sm border border-purple-500/30 text-purple-400 break-all">
-                  {capsule.hash}
-                </div>
-              </div>
-
-              <div>
-                <p className="text-sm text-white/50 mb-1 flex items-center gap-2">
-                  <Wallet className="w-4 h-4" /> Sealer Wallet Address
-                </p>
-                <div className="p-3 bg-black/40 rounded-xl font-mono text-sm border border-white/5 text-primary break-all">
-                  {capsule.walletAddress}
-                </div>
-              </div>
-
-              {capsule.ipfsCid && (
-                <div>
-                  <p className="text-sm text-white/50 mb-1 flex items-center gap-2">
-                    IPFS Content Identifier
+      <main className="relative z-10">
+        <div className="mx-auto max-w-5xl px-4 pb-16 pt-8 sm:px-6 lg:px-8">
+          <section className="animate-in-up">
+            <div className="rounded-2xl glass p-6 border-glow">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2">
+                    <ShieldCheck className="h-5 w-5 text-primary" />
+                    <h1 className="font-display text-xl sm:text-2xl">Verification</h1>
+                    <span className="rounded-full border border-white/10 bg-white/5 px-2 py-0.5 text-[11px] text-muted-foreground">
+                      /c/{id || "…"}
+                    </span>
+                  </div>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    Public, read-only capsule details. Copy hashes and share the link.
                   </p>
-                  <a 
-                    href={`https://ipfs.io/ipfs/${capsule.ipfsCid}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center justify-between p-3 bg-black/40 rounded-xl font-mono text-sm border border-white/5 hover:border-primary/50 text-white/90 transition-all group"
-                  >
-                    <span className="truncate mr-4">{capsule.ipfsCid}</span>
-                    <ExternalLink className="w-4 h-4 text-white/30 group-hover:text-primary flex-shrink-0" />
-                  </a>
                 </div>
+
+                <div className="flex flex-wrap items-center gap-2">
+                  <Button asChild variant="secondary">
+                    <a href={verificationUrl} target="_blank" rel="noreferrer">
+                      Open in new tab <ExternalLink className="ml-2 h-4 w-4" />
+                    </a>
+                  </Button>
+                </div>
+              </div>
+
+              <Separator className="my-5 bg-white/10" />
+
+              {isLoading ? (
+                <div className="rounded-2xl border border-white/10 bg-white/5 p-6">
+                  <div className="flex items-center gap-3 text-muted-foreground">
+                    <Loader2 className="h-5 w-5 animate-spin" />
+                    <p className="text-sm">Loading capsule…</p>
+                  </div>
+                </div>
+              ) : error ? (
+                <div className="rounded-2xl border border-white/10 bg-white/5 p-6">
+                  <div className="flex items-start gap-3">
+                    <FileX className="mt-0.5 h-5 w-5 text-accent" />
+                    <div>
+                      <p className="text-sm font-semibold">Couldn’t load capsule</p>
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        {String((error as any)?.message || error)}
+                      </p>
+                      <div className="mt-4 flex flex-wrap items-center gap-2">
+                        <Button onClick={() => window.location.reload()} variant="secondary">
+                          Retry
+                        </Button>
+                        <Button asChild>
+                          <Link href="/">Back</Link>
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ) : !data ? (
+                <div className="rounded-2xl border border-white/10 bg-white/5 p-6">
+                  <div className="flex items-start gap-3">
+                    <FileX className="mt-0.5 h-5 w-5 text-accent" />
+                    <div>
+                      <p className="text-sm font-semibold">Capsule not found</p>
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        Check the ID and try again.
+                      </p>
+                      <div className="mt-4 flex flex-wrap items-center gap-2">
+                        <Button asChild>
+                          <Link href="/">Forge a capsule</Link>
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+                    <div className="rounded-2xl glass-subtle p-5">
+                      <p className="text-xs text-muted-foreground">Project</p>
+                      <p className="mt-1 font-display text-lg">{data.projectName}</p>
+                      <p className={cn("mt-2 text-sm text-foreground/85", !data.description && "text-muted-foreground")}>
+                        {data.description || "—"}
+                      </p>
+
+                      <div className="mt-4 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                        <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1">
+                          <Fingerprint className="h-4 w-4 text-primary" />
+                          Capsule ID: <span className="font-mono text-foreground/90">{data.id}</span>
+                        </span>
+
+                        <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1">
+                          <Calendar className="h-4 w-4 text-accent" />
+                          {data.createdAt ? new Date(data.createdAt as any).toLocaleString() : "Timestamp unavailable"}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="rounded-2xl glass-subtle p-5">
+                      <p className="text-xs text-muted-foreground">Transcript</p>
+                      <pre className="mt-2 max-h-[320px] overflow-auto whitespace-pre-wrap break-words rounded-2xl bg-black/30 p-4 text-[12px] leading-relaxed text-foreground/95 ring-1 ring-white/10 font-mono">
+                        {data.transcript}
+                      </pre>
+                      <p className="mt-3 text-[11px] text-muted-foreground">
+                        The transcript is stored for verification and hashing. Treat it as public.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="mt-4 grid grid-cols-1 gap-3 lg:grid-cols-2">
+                    <CopyField label="Wallet" value={data.walletAddress} monospace />
+                    <CopyField label="X handle" value={data.xHandle || "—"} />
+                    <CopyField label="SHA-256 (capsule hash)" value={data.hash} monospace className="lg:col-span-2" />
+                    <CopyField label="IPFS CID" value={data.ipfsCid || "—"} monospace />
+                    <CopyField label="Verification link" value={verificationUrl} className="lg:col-span-2" />
+                  </div>
+
+                  <div className="mt-5 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                    <p className="text-[11px] text-muted-foreground">
+                      This page is public. Anyone with the link can verify the capsule.
+                    </p>
+                    <Button asChild>
+                      <Link href="/">Seal your own capsule</Link>
+                    </Button>
+                  </div>
+                </>
               )}
             </div>
-          </GlassCard>
-
-          <GlassCard variant="purple">
-            <h3 className="text-xl font-bold border-b border-white/10 pb-4 mb-4">Sealed Transcript</h3>
-            <pre className="p-6 bg-black/50 rounded-xl border border-white/10 overflow-x-auto text-sm font-mono text-white/80 whitespace-pre-wrap">
-              {capsule.transcript}
-            </pre>
-          </GlassCard>
+          </section>
         </div>
       </main>
-    </div>
+    </NeonShell>
   );
 }

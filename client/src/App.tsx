@@ -1,14 +1,29 @@
+import * as React from "react";
 import { Switch, Route } from "wouter";
-import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
-import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { RainbowKitProvider, darkTheme } from '@rainbow-me/rainbowkit';
-import { WagmiProvider } from 'wagmi';
-import { config } from './lib/web3';
+import { Toaster } from "@/components/ui/toaster";
 import NotFound from "@/pages/not-found";
 import Home from "@/pages/Home";
 import CapsuleView from "@/pages/CapsuleView";
+import { queryClient } from "./lib/queryClient";
+
+// Keep Wagmi Provider but avoid hard crashes if wagmi config file is missing/misconfigured.
+// (Some environments may not have working connectors; UI falls back to manual address input.)
+let WagmiProvider: React.ComponentType<{ config: any; children: React.ReactNode }> | null = null;
+let wagmiConfig: any = null;
+
+try {
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  const wagmi = await import("wagmi");
+  WagmiProvider = wagmi.WagmiProvider;
+
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  const web3 = await import("./lib/web3");
+  wagmiConfig = web3.config;
+} catch (e) {
+  console.warn("[CapsuleForge] Wagmi not available, continuing without auto-connect:", e);
+}
 
 function Router() {
   return (
@@ -21,23 +36,20 @@ function Router() {
 }
 
 function App() {
-  return (
-    <WagmiProvider config={config}>
-      <QueryClientProvider client={queryClient}>
-        <RainbowKitProvider theme={darkTheme({
-          accentColor: '#00f5ff',
-          accentColorForeground: '#0a0a0a',
-          borderRadius: 'large',
-          overlayBlur: 'small',
-        })}>
-          <TooltipProvider>
-            <Toaster />
-            <Router />
-          </TooltipProvider>
-        </RainbowKitProvider>
-      </QueryClientProvider>
-    </WagmiProvider>
+  const content = (
+    <QueryClientProvider client={queryClient}>
+      <TooltipProvider>
+        <Toaster />
+        <Router />
+      </TooltipProvider>
+    </QueryClientProvider>
   );
+
+  if (WagmiProvider && wagmiConfig) {
+    return <WagmiProvider config={wagmiConfig}>{content}</WagmiProvider>;
+  }
+
+  return content;
 }
 
 export default App;
